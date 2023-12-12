@@ -1,0 +1,144 @@
+name:        "Jitsi Meet Acorn"
+description: "Hosting a video conferencing solution on Acorn"
+readme:      "./README.md"
+icon:        "./jitsi-meet-icon.png"
+
+args: {
+  // Your local timezone ID e.g. America/Los_Angeles, Europe/London, etc. Default is America/Los_Angeles.
+  TZ: ""
+}
+
+containers: {
+  jicofo: {
+    image: "jitsi/jicofo:stable-9111"
+    ports: ["8888:8888", "80:80"]
+    env: {
+      JICOFO_AUTH_USER: "secret://jicofo/username"
+      JICOFO_AUTH_PASSWORD: "secret://jicofo/password"
+      JICOFO_COMPONENT_SECRET: "secret://jicofo-component-secret/token"
+      XMPP_AUTH_DOMAIN: "auth.meet.jitsi"
+      XMPP_INTERNAL_MUC_DOMAIN: "internal-muc.meet.jitsi"
+      XMPP_MUC_DOMAIN: "muc.meet.jitsi"
+      XMPP_RECORDER_DOMAIN: "recorder.meet.jitsi"
+      ENABLE_COLIBRI_WEBSOCKET: "false"
+      ENABLE_XMPP_WEBSOCKET: "false"
+      PUBLIC_URL: "meet.jitsi-acorn.com"
+      TZ: std.ifelse(args.TZ != "", args.TZ, "America/Los_Angeles")
+      XMPP_DOMAIN: "meet.jitsi"
+      XMPP_GUEST_DOMAIN: "guest.meet.jitsi"
+      ENABLE_AUTH: "0"
+      ENABLE_GUESTS: "1"
+      JVB_BREWERY_MUC: "jvbbrewery"
+      XMPP_SERVER: "prosody.@{acorn.namespace}.svc.cluster.local"
+    }
+    dependsOn: ["prosody"]
+  }
+  jvb: {
+    image: "jitsi/jvb:stable-9111"
+    ports: ["10000:10000/udp"]
+    env: {
+      JVB_AUTH_USER: "secret://jvb/username"
+      JVB_AUTH_PASSWORD: "secret://jvb/password"
+      ENABLE_AUTH: "0"
+      ENABLE_GUESTS: "1"
+      PUBLIC_URL: "meet.jitsi-acorn.com"
+      XMPP_DOMAIN: "meet.jitsi"
+      XMPP_MUC_DOMAIN: "muc.meet.jitsi"
+      XMPP_AUTH_DOMAIN: "auth.meet.jitsi"
+      XMPP_GUEST_DOMAIN: "guest.meet.jitsi"
+      XMPP_RECORDER_DOMAIN: "recorder.meet.jitsi"
+      XMPP_INTERNAL_MUC_DOMAIN: "internal-muc.meet.jitsi"
+      ENABLE_COLIBRI_WEBSOCKET: "false"
+      ENABLE_XMPP_WEBSOCKET: "false"
+      TZ: std.ifelse(args.TZ != "", args.TZ, "America/Los_Angeles")
+      JVB_BREWERY_MUC: "jvbbrewery"
+      JVB_PORT: "10000"
+      JVB_STUN_SERVERS: "meet-jit-si-turnrelay.jitsi.net:443"
+      JVB_TCP_HARVESTER_DISABLED: "1"
+      XMPP_SERVER: "prosody.@{acorn.namespace}.svc.cluster.local"
+      COLIBRI_REST_ENABLED: "true"
+    }
+    dependsOn: ["prosody"]
+  }
+  web: {
+    image: "jitsi/web:stable-9111"
+    ports: publish: ["80/http"]
+    env: {
+      DISABLE_HTTPS: "1"
+      ENABLE_HTTP_REDIRECT: "0"
+      JICOFO_AUTH_USER: "secret://jicofo/username"
+      XMPP_BOSH_URL_BASE: "http://prosody.@{acorn.namespace}.svc.cluster.local:5280"
+      ENABLE_AUTH: "0"
+      ENABLE_GUESTS: "1"
+      PUBLIC_URL: "meet.jitsi-acorn.com"
+      XMPP_DOMAIN: "meet.jitsi"
+      XMPP_MUC_DOMAIN: "muc.meet.jitsi"
+      XMPP_AUTH_DOMAIN: "auth.meet.jitsi"
+      XMPP_GUEST_DOMAIN: "guest.meet.jitsi"
+      XMPP_RECORDER_DOMAIN: "recorder.meet.jitsi"
+      XMPP_INTERNAL_MUC_DOMAIN: "internal-muc.meet.jitsi"
+      ENABLE_COLIBRI_WEBSOCKET: "false"
+      ENABLE_XMPP_WEBSOCKET: "false"
+      TZ: std.ifelse(args.TZ != "", args.TZ, "America/Los_Angeles")
+    }
+  }
+  prosody: {
+    image: "jitsi/prosody:stable-9111"
+    ports: expose: ["5222:5222","5269:5269","5347:5347","5280:5280/http","5281:5281/http"]
+    dirs: {
+      "/config/data": "volume://prosody-data"
+    }
+    env: {
+      JICOFO_AUTH_USER: "secret://jicofo/username"
+      JICOFO_AUTH_PASSWORD: "secret://jicofo/password"
+      JICOFO_COMPONENT_SECRET: "secret://jicofo-component-secret/token"
+      JVB_AUTH_USER: "secret://jvb/username"
+      JVB_AUTH_PASSWORD: "secret://jvb/password"
+      ENABLE_AUTH: "0"
+      ENABLE_GUESTS: "1"
+      PUBLIC_URL: "meet.jitsi-acorn.com"
+      XMPP_DOMAIN: "meet.jitsi"
+      XMPP_MUC_DOMAIN: "muc.meet.jitsi"
+      XMPP_AUTH_DOMAIN: "auth.meet.jitsi"
+      XMPP_GUEST_DOMAIN: "guest.meet.jitsi"
+      XMPP_RECORDER_DOMAIN: "recorder.meet.jitsi"
+      XMPP_INTERNAL_MUC_DOMAIN: "internal-muc.meet.jitsi"
+      ENABLE_COLIBRI_WEBSOCKET: "false"
+      ENABLE_XMPP_WEBSOCKET: "false"
+      TZ: std.ifelse(args.TZ != "", args.TZ, "America/Los_Angeles")
+    }
+  }
+}
+
+secrets: {
+  "jicofo-component-secret": type: "token"
+
+  jicofo: {
+    name: "credentials of the jicofo user"
+    type: "basic"
+    params: {
+      passwordLength:     10
+      passwordCharacters: "A-Za-z0-9"
+    }
+    data: {
+      username: "jicofo"
+      password: ""
+    }
+  }
+  jvb: {
+    name: "credentials of the jvb user"
+    type: "basic"
+    params: {
+      passwordLength:     10
+      passwordCharacters: "A-Za-z0-9"
+    }
+    data: {
+      username: "jvb"
+      password: ""
+    }
+  }
+}
+
+volumes: {
+    "prosody-data": {}
+}
